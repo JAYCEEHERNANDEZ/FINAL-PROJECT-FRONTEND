@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 
 const ResidentDashboard = () => {
   const navItems = [
-    { label: "Dashboard", path: "/resident-dashboard" }
+    { label: "Dashboard", path: "/resident-dashboard" },
+    { label: "Payment", path: "/payments" },
   ];
 
   return (

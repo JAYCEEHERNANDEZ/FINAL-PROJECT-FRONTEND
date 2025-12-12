@@ -7,6 +7,10 @@ const ResidentDashboard = () => {
     { label: "Payment", path: "/payments" },
   ];
 
+
+
+
+  
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-black text-white font-sans">
 

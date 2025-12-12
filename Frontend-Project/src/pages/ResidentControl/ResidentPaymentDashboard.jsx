@@ -23,7 +23,6 @@ const ResidentPaymentDashboard = () => {
 
   const [referenceCode, setReferenceCode] = useState("");
   const [proofImage, setProofImage] = useState(null);
-
   const [stickyMessage, setStickyMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -77,33 +76,39 @@ const ResidentPaymentDashboard = () => {
 
       const now = new Date();
       const currentMonthStart = startOfMonth(now);
-      const twoMonthsAgoStart = addMonths(currentMonthStart, -2);
+      const prevMonthStart = addMonths(currentMonthStart, -1);
+      const nextMonthStart = addMonths(currentMonthStart, 1);
 
-      const unpaidBills = sorted.filter((p) => Number(p.remaining_balance) > 0);
-
-      const unpaidWithinWindow = unpaidBills.filter((p) => {
+      // --- Only consider previous + current month bills ---
+      const validBills = sorted.filter(p => {
         const billDate = new Date(p.billing_date);
         billDate.setHours(0, 0, 0, 0);
-        return billDate >= twoMonthsAgoStart && billDate < currentMonthStart;
+        return billDate >= prevMonthStart && billDate < nextMonthStart;
       });
 
-      const oldestUnpaidInWindow = unpaidWithinWindow.length > 0 ? unpaidWithinWindow[0] : null;
-      setEnforcedUnpaid(oldestUnpaidInWindow);
-
-      const currentMonth = sorted.find((p) => {
+      // --- Enforce unpaid bills from previous month ONLY ---
+      const prevMonthUnpaid = validBills.filter(p => {
         const d = new Date(p.billing_date);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        return d.getMonth() === prevMonthStart.getMonth() &&
+               d.getFullYear() === prevMonthStart.getFullYear() &&
+               Number(p.remaining_balance) > 0;
+      });
+
+      const oldestPrevMonthUnpaid = prevMonthUnpaid.length > 0 ? prevMonthUnpaid[0] : null;
+      setEnforcedUnpaid(oldestPrevMonthUnpaid);
+
+      // Current month bill
+      const currentMonthBillDetected = validBills.find(p => {
+        const d = new Date(p.billing_date);
+        return d.getMonth() === currentMonthStart.getMonth() && d.getFullYear() === currentMonthStart.getFullYear();
       }) || null;
 
-      let currentMonthBlocked = false;
-      if (currentMonth && oldestUnpaidInWindow && new Date(oldestUnpaidInWindow.billing_date).getMonth() < now.getMonth()) {
-        currentMonthBlocked = true;
-      }
-      setCurrentMonthBill(currentMonthBlocked ? null : currentMonth);
+      setCurrentMonthBill(oldestPrevMonthUnpaid ? null : currentMonthBillDetected);
 
-      const currentMonthBills = sorted.filter((p) => {
+      // --- Current month summary ---
+      const currentMonthBills = validBills.filter(p => {
         const d = new Date(p.billing_date);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        return d.getMonth() === currentMonthStart.getMonth() && d.getFullYear() === currentMonthStart.getFullYear();
       });
 
       const totalPaid = currentMonthBills.reduce((acc, p) => acc + parseFloat(p.payment_total || 0), 0);
@@ -112,7 +117,7 @@ const ResidentPaymentDashboard = () => {
       let status = "Unpaid";
       if (totalPaid > 0 && totalPaid < totalBill) status = "Partial";
       else if (totalPaid >= totalBill && totalBill > 0) status = "Paid";
-      if (currentMonthBlocked) status = "Blocked - Previous Month Unpaid";
+      if (oldestPrevMonthUnpaid) status = "Blocked - Previous Month Unpaid";
 
       setCurrentPaidSummary({ payment_total: totalPaid, status });
       resetForm();
@@ -143,9 +148,20 @@ const ResidentPaymentDashboard = () => {
   const dismissStickyMessage = () => setStickyMessage(null);
 
   const billToPay = () => {
+    // If previous month unpaid exists, pay that first
     if (enforcedUnpaid) return enforcedUnpaid;
-    if (currentMonthBill && Number(currentMonthBill.remaining_balance) > 0) return currentMonthBill;
-    return paymentHistory.slice().reverse().find((p) => Number(p.remaining_balance) > 0) || null;
+
+    // Otherwise, allow current month bill
+    const now = new Date();
+    const currentMonthStart = startOfMonth(now);
+    const currentMonthBill = paymentHistory.find(p => {
+      const d = new Date(p.billing_date);
+      return d.getMonth() === currentMonthStart.getMonth() &&
+             d.getFullYear() === currentMonthStart.getFullYear() &&
+             Number(p.remaining_balance) > 0;
+    });
+
+    return currentMonthBill || null;
   };
 
   const handleSubmitProof = async () => {
@@ -249,7 +265,7 @@ const ResidentPaymentDashboard = () => {
               </div>
               <p className="text-gray-600 mt-1">
                 {isEnforced
-                  ? "You must pay the oldest unpaid bill within the last 2 months before proceeding."
+                  ? "You have unpaid bills from the previous month. Pay the oldest first before newer bills."
                   : "Latest Unpaid / Current Month Balance"}
               </p>
               {selectedBill && (
@@ -275,7 +291,7 @@ const ResidentPaymentDashboard = () => {
 
               {isEnforced && (
                 <div className="mb-3 p-3 rounded border border-red-200 bg-red-50 text-red-700">
-                  You have unpaid bills within the last 2 months. You must pay the oldest of those first before paying newer bills.
+                  You have unpaid bills from the previous month. Pay the oldest first before newer bills.
                   <div className="text-xs mt-1">Billing month: {new Date(enforcedUnpaid.billing_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</div>
                 </div>
               )}
@@ -317,7 +333,7 @@ const ResidentPaymentDashboard = () => {
             </div>
           ) : (
             <div className="bg-white p-6 rounded-xl shadow-md">
-              <p className="text-gray-700">No unpaid bills found in the enforced 2-months.</p>
+              <p className="text-gray-700">No unpaid bills found in the previous + current month.</p>
             </div>
           )}
 

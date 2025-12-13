@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import MeterReaderLayout from "./MeterReaderLayout.jsx";
+import SideBarHeader from "./MeterReaderLayout.jsx";
 import { fetchConsumptions, fetchUsers } from "../../api/api.js";
 import usePageTitle from "../usePageTitle";
 
@@ -11,7 +11,7 @@ const MeterReaderDashboard = () => {
   const [filterMonth, setFilterMonth] = useState("");
   const [filterYear, setFilterYear] = useState("");
 
- // Load data
+// Load data
   useEffect(() => {
     loadConsumptions();
     loadUsers();
@@ -35,7 +35,7 @@ const MeterReaderDashboard = () => {
     }
   };
 
- // Filters
+  // Filters
   const years = Array.from(new Set([
     ...consumptions.map(c => new Date(c.billing_date || c.created_at).getFullYear()),
     ...users.map(u => new Date(u.created_at).getFullYear())
@@ -53,14 +53,14 @@ const MeterReaderDashboard = () => {
            (!filterMonth || created.getMonth() + 1 === Number(filterMonth));
   });
 
- // KPI Calculations
+  // KPI Calculations
   const totalBill = filteredConsumptions.reduce((sum, c) => sum + Number(c.total_bill || 0), 0);
   const totalBalance = filteredConsumptions.reduce((sum, c) => sum + Number(c.remaining_balance || 0), 0);
   const totalIncome = filteredConsumptions.reduce((sum, c) => sum + Number(c.payment_total || 0), 0);
   const totalCubicUsed = filteredConsumptions.reduce((sum, c) => sum + Number(c.cubic_used || 0), 0);
   const totalUsersFiltered = filteredUsers.length;
 
- // Chart Data 
+  // Chart Data
   const chartDataMap = {};
   filteredConsumptions.forEach(c => {
     if (!c.billing_date) return;
@@ -82,7 +82,7 @@ const MeterReaderDashboard = () => {
   const filterLabel = `${filterMonth ? new Date(0, filterMonth - 1).toLocaleString("default", { month: "short" }) : "All Months"} / ${filterYear || "All Years"}`;
 
   return (
-    <MeterReaderLayout>
+    <SideBarHeader>
       {/* Filters */}
       <div className="flex gap-4 mb-6">
         <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="p-2 rounded shadow-inner">
@@ -109,7 +109,7 @@ const MeterReaderDashboard = () => {
           { label: "Total Income", value: `₱ ${totalIncome.toLocaleString()}`, color: "text-yellow-600" },
           { label: "Cubic Meters Used", value: totalCubicUsed, color: "text-purple-600" },
         ].map((kpi, idx) => (
-          <div key={idx} className="bg-white p-6 rounded-xl shadow-md flex flex-col justify-between">
+          <div key={idx} className="bg-black/5 p-6 rounded-xl shadow-md flex flex-col justify-between">
             <p className={`text-3xl font-bold ${kpi.color}`}>{kpi.value}</p>
             <p className="text-gray-600 mt-1 text-sm">{kpi.label}</p>
             {(filterMonth || filterYear) && <span className="text-gray-400 text-xs mt-1">{filterLabel}</span>}
@@ -119,7 +119,7 @@ const MeterReaderDashboard = () => {
 
       {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        <div className="bg-white p-6 rounded-xl shadow-md">
+        <div className=" p-6 rounded-xl shadow-md bg-black/5">
           <h2 className="text-lg font-semibold mb-4">Cubic Meters Used</h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
@@ -132,7 +132,7 @@ const MeterReaderDashboard = () => {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-md">
+        <div className="p-6 rounded-xl shadow-md bg-black/5">
           <h2 className="text-lg font-semibold mb-4">Total Income (₱)</h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
@@ -145,7 +145,7 @@ const MeterReaderDashboard = () => {
           </ResponsiveContainer>
         </div>
       </div>
-    </MeterReaderLayout>
+    </SideBarHeader>
   );
 };
 

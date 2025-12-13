@@ -1,136 +1,152 @@
-  import React from "react";
-  import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import SideBarHeader from "./SideBarHeader.jsx";
+import { fetchConsumptions, fetchUsers } from "../../api/api.js";
+import usePageTitle from "../usePageTitle";
 
-  const Dashboard = () => {
-    const navItems = [
-      { label: "Dashboard", path: "/admin-dashboard" },
-      { label: "Records", path: "/manage-records" },
-      { label: "Notification", path: "/notification-center" },
-      { label: "Profiles", path: "/admin-profiles" },
-      { label: "Manage Customers", path: "/manage-customers" },
-      { label: "Reports", path: "/reports" },
-    ];
+const AdminDashboard = () => {
+  usePageTitle("Admin Dashboard");
+  const [consumptions, setConsumptions] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
 
-    return (
-      <div className="flex bg-gradient-to-br from-gray-900 via-gray-950 to-black min-h-screen text-white">
+// Load data
+  useEffect(() => {
+    loadConsumptions();
+    loadUsers();
+  }, []);
 
-        {/* Sidebar */}
-        <aside className="w-64 backdrop-blur-xl bg-white/5 border-r border-blue-500/20 shadow-xl p-6">
-          <h2 className="text-2xl font-bold text-blue-400 drop-shadow-lg mb-10 tracking-wide">
-            Sucol Water System
-          </h2>
-
-          <nav className="flex flex-col gap-4 text-gray-300">
-            {navItems.map((item) => (
-              <Link
-                key={item.label}
-                to={item.path}
-                className="hover:text-blue-400 hover:translate-x-1 transition-all"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </aside>
-
-        {/* MAIN CONTENT */}
-        <main className="flex-1 p-10">
-          {/* Title Bar */}
-          <div className="bg-blue-600/40 backdrop-blur-lg text-white text-xl font-semibold py-4 px-5 rounded-xl border border-blue-500/30 shadow-lg shadow-blue-900/40">
-            Water Management Dashboard
-          </div>
-
-          {/* CLIENT DETAILS */}
-          <div className="bg-white/10 backdrop-blur-xl border border-gray-700/40 shadow-lg p-6 mt-8 rounded-xl">
-            <h3 className="text-lg font-semibold mb-4 text-blue-300">
-              Sucol water system – Client Company
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
-              <p><strong className="text-blue-300">Client Name:</strong> MCD Delhi</p>
-              <p><strong className="text-blue-300">Location:</strong> Sucol Balayan Batangas</p>
-
-              <p><strong className="text-blue-300">Date of Commissioning:</strong> 21-SEP-2021</p>
-
-              <p><strong className="text-blue-300">Elec Officer Incharge:</strong> Mr. Siddharth Malhotra</p>
-              <p><strong className="text-blue-300">Client Office Incharge:</strong> Mr. Harshvardhan Rane</p>
-            </div>
-          </div>
-
-          {/* STAT CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-            {[
-              { num: "42 Litre", label: "Daily Water Treated", color: "pink" },
-              { num: "45 Litre", label: "MTD Water Treated", color: "blue" },
-              { num: "42 Litre", label: "YTD Water Treated", color: "purple" },
-              { num: "50 Litre", label: "Total Water Treated", color: "yellow" }
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="bg-white/10 backdrop-blur-xl border border-gray-700/40 p-6 rounded-xl shadow-lg hover:shadow-blue-800/40 transition-all"
-              >
-                <p className={`text-${item.color}-400 text-3xl font-bold drop-shadow-md`}>
-                  {item.num}
-                </p>
-                <p className="text-gray-300 mt-1 text-sm">{item.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ELECTRICITY CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-            {[
-              { num: "69 kWh", label: "Daily Electricity Consumed", color: "pink" },
-              { num: "80 kWh", label: "MTD Electricity Consumed", color: "green" },
-              { num: "90 kWh", label: "YTD Electricity Consumed", color: "purple" },
-              { num: "100 kWh", label: "Total Electricity Consumed", color: "blue" }
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="bg-white/10 backdrop-blur-xl border border-gray-700/40 p-6 rounded-xl shadow-lg hover:shadow-blue-800/40 transition-all"
-              >
-                <p className={`text-${item.color}-400 text-3xl font-bold drop-shadow-md`}>
-                  {item.num}
-                </p>
-                <p className="text-gray-300 mt-1 text-sm">{item.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* CLIENT MACHINE TABLE */}
-          <div className="bg-white/10 backdrop-blur-xl border border-gray-700/40 shadow-lg p-6 rounded-xl mt-10">
-            <h3 className="text-lg font-semibold mb-4 text-blue-300">Client Machine</h3>
-
-            <table className="w-full border-collapse text-gray-300">
-              <thead>
-                <tr className="bg-white/5 border-b border-gray-600">
-                  {["Make", "Model", "Serial No.", "Status"].map((col) => (
-                    <th key={col} className="p-3 text-left text-blue-300">{col}</th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                <tr className="border-b border-gray-700/50 hover:bg-white/5 transition">
-                  <td className="p-3">123</td>
-                  <td className="p-3">SDRF</td>
-                  <td className="p-3">1234FGH</td>
-                  <td className="p-3 text-green-400 font-semibold">Active</td>
-                </tr>
-
-                <tr className="border-b border-gray-700/50 hover:bg-white/5 transition">
-                  <td className="p-3">456</td>
-                  <td className="p-3">QWER</td>
-                  <td className="p-3">8689CHJ</td>
-                  <td className="p-3 text-red-400 font-semibold">Inactive</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-        </main>
-      </div>
-    );
+  const loadConsumptions = async () => {
+    try {
+      const res = await fetchConsumptions();
+      setConsumptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Error fetching consumptions:", err);
+    }
   };
 
-  export default Dashboard;
+  const loadUsers = async () => {
+    try {
+      const res = await fetchUsers();
+      setUsers(res.data?.message || []);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
+  };
+
+  // Filters
+  const years = Array.from(new Set([
+    ...consumptions.map(c => new Date(c.billing_date || c.created_at).getFullYear()),
+    ...users.map(u => new Date(u.created_at).getFullYear())
+  ])).sort((a, b) => b - a);
+
+  const filteredConsumptions = consumptions.filter(c => {
+    const date = new Date(c.billing_date || c.created_at);
+    return (!filterYear || date.getFullYear() === Number(filterYear)) &&
+           (!filterMonth || date.getMonth() + 1 === Number(filterMonth));
+  });
+
+  const filteredUsers = users.filter(u => {
+    const created = new Date(u.created_at);
+    return (!filterYear || created.getFullYear() === Number(filterYear)) &&
+           (!filterMonth || created.getMonth() + 1 === Number(filterMonth));
+  });
+
+  // KPI Calculations
+  const totalBill = filteredConsumptions.reduce((sum, c) => sum + Number(c.total_bill || 0), 0);
+  const totalBalance = filteredConsumptions.reduce((sum, c) => sum + Number(c.remaining_balance || 0), 0);
+  const totalIncome = filteredConsumptions.reduce((sum, c) => sum + Number(c.payment_total || 0), 0);
+  const totalCubicUsed = filteredConsumptions.reduce((sum, c) => sum + Number(c.cubic_used || 0), 0);
+  const totalUsersFiltered = filteredUsers.length;
+
+  // Chart Data
+  const chartDataMap = {};
+  filteredConsumptions.forEach(c => {
+    if (!c.billing_date) return;
+    const date = new Date(c.billing_date);
+    const monthName = date.toLocaleString("default", { month: "short" });
+    const year = date.getFullYear();
+    const key = `${monthName} ${year}`;
+    if (!chartDataMap[key]) chartDataMap[key] = { month: key, cubic_used: 0, income: 0 };
+    chartDataMap[key].cubic_used += Number(c.cubic_used || 0);
+    chartDataMap[key].income += Number(c.payment_1 || 0) + Number(c.payment_2 || 0);
+  });
+
+  const chartData = Object.values(chartDataMap).sort((a, b) => {
+    const [aMonth, aYear] = a.month.split(" ");
+    const [bMonth, bYear] = b.month.split(" ");
+    return new Date(`${aMonth} 1, ${aYear}`) - new Date(`${bMonth} 1, ${bYear}`);
+  });
+
+  const filterLabel = `${filterMonth ? new Date(0, filterMonth - 1).toLocaleString("default", { month: "short" }) : "All Months"} / ${filterYear || "All Years"}`;
+
+  return (
+    <SideBarHeader>
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="p-2 rounded shadow-inner">
+          <option value="">All Months</option>
+          {Array.from({ length: 12 }, (_, i) => (
+            <option key={i + 1} value={i + 1}>
+              {new Date(0, i).toLocaleString("default", { month: "long" })}
+            </option>
+          ))}
+        </select>
+
+        <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="p-2 rounded shadow-inner">
+          <option value="">All Years</option>
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-6 gap-6 mt-2">
+        {[
+          { label: "Total Users", value: totalUsersFiltered, color: "text-blue-600" },
+          { label: "Overall Bill", value: `₱ ${totalBill.toLocaleString()}`, color: "text-green-600" },
+          { label: "Balance of All Consumers", value: `₱ ${totalBalance.toLocaleString()}`, color: "text-red-600" },
+          { label: "Total Income", value: `₱ ${totalIncome.toLocaleString()}`, color: "text-yellow-600" },
+          { label: "Cubic Meters Used", value: totalCubicUsed, color: "text-purple-600" },
+        ].map((kpi, idx) => (
+          <div key={idx} className="bg-black/5 p-6 rounded-xl shadow-md flex flex-col justify-between">
+            <p className={`text-3xl font-bold ${kpi.color}`}>{kpi.value}</p>
+            <p className="text-gray-600 mt-1 text-sm">{kpi.label}</p>
+            {(filterMonth || filterYear) && <span className="text-gray-400 text-xs mt-1">{filterLabel}</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div className=" p-6 rounded-xl shadow-md bg-black/5">
+          <h2 className="text-lg font-semibold mb-4">Cubic Meters Used</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey="cubic_used" stroke="#8884d8" strokeWidth={3} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="p-6 rounded-xl shadow-md bg-black/5">
+          <h2 className="text-lg font-semibold mb-4">Total Income (₱)</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey="income" stroke="#82ca9d" strokeWidth={3} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </SideBarHeader>
+  );
+};
+
+export default AdminDashboard;

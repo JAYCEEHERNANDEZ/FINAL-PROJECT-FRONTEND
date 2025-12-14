@@ -75,7 +75,7 @@ const NotificationCenter = () => {
       )}
 
       {/* Send Notification */}
-      <div className="bg-white p-6 rounded-xl shadow mb-6">
+      <div className="bg-white p-6 rounded-xl shadow mb-6 hover:shadow-lg hover:shadow-blue-400">
         <h2 className="font-semibold text-blue-700 mb-3 text-lg">
           Send Notification
         </h2>
@@ -108,7 +108,7 @@ const NotificationCenter = () => {
       </div>
 
       {/* Sent Notifications */}
-      <div className="bg-white p-6 rounded-xl shadow">
+      <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg hover:shadow-blue-400">
         <h3 className="font-semibold mb-4 text-blue-700 text-lg">
           Sent Notifications
         </h3>

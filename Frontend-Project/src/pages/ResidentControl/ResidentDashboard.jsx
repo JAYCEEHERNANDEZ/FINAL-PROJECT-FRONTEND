@@ -8,6 +8,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  AreaChart,
+  Area,
 } from "recharts";
 import ResidentLayout from "./ResidentLayout.jsx";
 import { fetchConsumptionsByUser } from "../../api/api.js";
@@ -166,42 +168,45 @@ const ResidentDashboard = () => {
       </div>
 
       {/* OVERALL CONSUMPTION & BILL TREND */}
-      <div className="bg-white p-6 rounded-xl shadow-md mt-5">
-        <h2 className="lg:text-xl md:text-xl text-default font-semibold text-black mb-4">Usage & Billing Trend</h2>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart
-            data={filteredConsumptions.map((c) => ({
-              date: c.billing_date.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
-              cubic_used: c.cubic_used,
-              current_bill: c.current_bill,
-            }))}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip
-              formatter={(value, name) =>
-                name === "Current Bill" ? `₱${value}` : `${value} m³`
-              }
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="cubic_used"
-              stroke="#1D4ED8"
-              strokeWidth={3}
-              name="Cubic Used"
-            />
-            <Line
-              type="monotone"
-              dataKey="current_bill"
-              stroke="#DC2626"
-              strokeWidth={3}
-              name="Current Bill"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+<div className="bg-white p-6 rounded-xl shadow-md mt-5">
+  <h2 className="lg:text-xl md:text-xl text-default font-semibold text-black mb-4">Usage & Billing Trend</h2>
+  <ResponsiveContainer width="100%" height={250}>
+    <AreaChart
+      data={filteredConsumptions.map((c) => ({
+        date: c.billing_date.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+        cubic_used: c.cubic_used,
+        current_bill: c.current_bill,
+      }))}
+    >
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="date" />
+      <YAxis />
+      <Tooltip
+        formatter={(value, name) =>
+          name === "current_bill" ? `₱${value}` : `${value} m³`
+        }
+      />
+      <Legend />
+      <Area
+        type="monotone"
+        dataKey="cubic_used"
+        stroke="#1D4ED8"
+        fill="#1D4ED8"
+        fillOpacity={0.2}
+        name="Cubic Used"
+      />
+      <Area
+        type="monotone"
+        dataKey="current_bill"
+        stroke="#DC2626"
+        fill="#DC2626"
+        fillOpacity={0.2}
+        name="Current Bill"
+      />
+    </AreaChart>
+  </ResponsiveContainer>
+</div>
+
     </ResidentLayout>
   );
 };

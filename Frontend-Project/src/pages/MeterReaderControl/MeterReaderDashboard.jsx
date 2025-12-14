@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart,
+  Area, } from "recharts";
 import SideBarHeader from "./MeterReaderLayout.jsx";
 import { fetchConsumptions, fetchUsers } from "../../api/api.js";
 import usePageTitle from "../usePageTitle";
@@ -117,31 +118,47 @@ const MeterReaderDashboard = () => {
         ))}
       </div>
 
-      {/* Charts */}
+            {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        <div className=" p-6 rounded-xl shadow-md bg-black/5">
+        {/* Cubic Meters Used Chart */}
+        <div className="p-6 rounded-xl shadow-md bg-black/5">
           <h2 className="text-lg font-semibold mb-4">Cubic Meters Used</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+            <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="cubic_used" stroke="#8884d8" strokeWidth={3} activeDot={{ r: 6 }} />
-            </LineChart>
+              <Area
+                type="monotone"
+                dataKey="cubic_used"
+                stroke="#8884d8"
+                fill="#8884d8"
+                fillOpacity={0.3}
+                activeDot={{ r: 6 }}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
-
+      
+        {/* Total Income Chart */}
         <div className="p-6 rounded-xl shadow-md bg-black/5">
           <h2 className="text-lg font-semibold mb-4">Total Income (₱)</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+            <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="income" stroke="#82ca9d" strokeWidth={3} activeDot={{ r: 6 }} />
-            </LineChart>
+              <Area
+                type="monotone"
+                dataKey="income"
+                stroke="#82ca9d"
+                fill="#82ca9d"
+                fillOpacity={0.3}
+                activeDot={{ r: 6 }}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>

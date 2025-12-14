@@ -12,7 +12,7 @@ import {
 } from "../../api/api.js";
 import usePageTitle from "../usePageTitle";
 
-const EPSILON = 0.01; // tolerance for float comparisons
+const EPSILON = 0.01;
 
 const ManageRecords = () => {
   usePageTitle("User Payment Records");
@@ -192,9 +192,7 @@ const ManageRecords = () => {
         return;
       }
 
-      /* ==================================================
-       PREVIOUS MONTH → FULL PAYMENT ONLY
-    ================================================== */
+   //    PREVIOUS MONTH → FULL PAYMENT ONLY
       if (isPreviousMonth(record.billing_date)) {
         const remaining = Number(record.remaining_balance || 0);
 
@@ -207,9 +205,8 @@ const ManageRecords = () => {
         }
       }
 
-      /* ==================================================
-       CURRENT MONTH RULES
-    ================================================== */
+   //    CURRENT MONTH RULES
+
       if (isCurrentMonth(record.billing_date)) {
         // Block if previous month unpaid
         if (previousRecord && Number(previousRecord.remaining_balance) > 0) {
@@ -241,15 +238,14 @@ const ManageRecords = () => {
         }
       }
 
-      /* ==================================================
-       RECORD PAYMENT
-    ================================================== */
+ 
+     //  RECORD PAYMENT
+
       await adminRecordPayment(paymentId, entered);
       showStickyMessage("success", "Payment recorded successfully.");
 
-      /* ==================================================
-       MARK ADMIN NOTIFICATIONS AS READ
-    ================================================== */
+   //    MARK ADMIN NOTIFICATIONS AS READ
+
       const relatedNotifications = notifications.filter(
         (n) => n.user_id === userId && !n.is_read && n.title.includes("Payment")
       );
@@ -269,9 +265,8 @@ const ManageRecords = () => {
         )
       );
 
-      /* ==================================================
-       GENERATE RECEIPT
-    ================================================== */
+    //   GENERATE RECEIPT
+
       const paymentType = isPreviousMonth(record.billing_date)
         ? "Full Payment (Previous Month)"
         : Number(record.payment_1 || 0) > 0
@@ -280,9 +275,8 @@ const ManageRecords = () => {
 
       await handleGenerateReceipt(userId, paymentId, entered, paymentType);
 
-      /* ==================================================
-       REFRESH DATA
-    ================================================== */
+   //    REFRESH DATA
+
       await loadUserRecords(userId);
 
       setAdminPayments((prev) => {
@@ -452,14 +446,14 @@ const ManageRecords = () => {
           return (
             <div
               key={user.id}
-              className={`bg-white p-4 mb-2 rounded-lg shadow hover:shadow-lg transition ${
+              className={`bg-white p-4 mb-2 rounded-lg shadow-black hover:shadow-lg hover:bg-blue-50 transition ${
                 expandedUserId === user.id ? "border-2 border-blue-400" : ""
               } ${hasPendingPayment ? "border-2 border-yellow-400" : ""}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
-                    className="text-lg font-semibold text-blue-600 hover:text-blue-500"
+                    className="text-lg font-semibold text-blue-600 hover:text-black"
                     onClick={() => expandUser(user.id)}
                   >
                     {user.name}
@@ -483,7 +477,7 @@ const ManageRecords = () => {
                     onClick={() => openNoticeModal(user.id)}
                     className="ml-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white px-4 py-1 rounded shadow hover:shadow-lg flex items-center gap-2"
                   >
-                    <FaPaperPlane /> Send Notice
+                    <FaPaperPlane /> Send Message
                   </button>
                 </div>
               </div>

@@ -226,7 +226,7 @@ const RecordConsumption = () => {
                     type="number"
                     value={currentReadingInput}
                     onChange={handleInputChange}
-                    className="p-2 bg-gray-100 rounded w-full"
+                    className="p-2 bg-gray-100 rounded w-full border border-gray-300"
                     required
                   />
                 </div>

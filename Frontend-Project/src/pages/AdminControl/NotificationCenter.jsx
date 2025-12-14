@@ -77,7 +77,7 @@ const NotificationCenter = () => {
       {/* Send Notification */}
       <div className="bg-white p-6 rounded-xl shadow mb-6">
         <h2 className="font-semibold text-blue-700 mb-3 text-lg">
-          Broadcast Notification
+          Send Notification
         </h2>
 
         <form className="grid gap-4" onSubmit={handleSubmit}>

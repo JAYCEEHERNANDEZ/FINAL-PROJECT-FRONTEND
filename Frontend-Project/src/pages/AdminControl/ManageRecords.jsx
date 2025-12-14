@@ -38,6 +38,18 @@ const ManageRecords = () => {
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
 
+  const isSameMonth = (date, month, year) => {
+    const d = new Date(date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  };
+
+  const isCurrentMonth = (date) => isSameMonth(date, currentMonth, currentYear);
+
+  const isPreviousMonth = (date) => {
+    const prev = new Date(currentYear, currentMonth - 1, 1);
+    return isSameMonth(date, prev.getMonth(), prev.getFullYear());
+  };
+
   const getStatus = (record) => {
     if (!record) return "Unpaid";
     const remaining = Number(record.remaining_balance || 0);
@@ -108,11 +120,16 @@ const ManageRecords = () => {
         const d = new Date(r.billing_date);
         const m = d.getMonth();
         const y = d.getFullYear();
-        return (m === currentMonth && y === currentYear) || (m === prevMonth && y === prevYear);
+        return (
+          (m === currentMonth && y === currentYear) ||
+          (m === prevMonth && y === prevYear)
+        );
       });
 
       // Sort descending (latest first)
-      const sorted = filtered.sort((a, b) => new Date(b.billing_date) - new Date(a.billing_date));
+      const sorted = filtered.sort(
+        (a, b) => new Date(b.billing_date) - new Date(a.billing_date)
+      );
 
       setRecordsByUser((prev) => ({ ...prev, [userId]: sorted }));
     } catch (err) {
@@ -149,129 +166,163 @@ const ManageRecords = () => {
   // Submit Payment with enforcement:
   // - If previous-month exists and remaining_balance > 0, admin must pay previous month full (exact match) before recording current month.
   const handleSubmitPayment = async (userId, paymentId) => {
-  try {
-    const records = recordsByUser[userId] || [];
-    const latest = records[0] || null; // current month
-    const prev = records[1] || null; // previous month if present
+    try {
+      const records = recordsByUser[userId] || [];
 
-    const targetRecord = records.find((r) => String(r.id) === String(paymentId));
-    if (!targetRecord) {
-      showStickyMessage("error", "Record not found.");
-      return;
-    }
+      // Identify records by month
+      const currentRecord =
+        records.find((r) => isCurrentMonth(r.billing_date)) || null;
 
-    const enteredValueRaw = adminPayments[paymentId];
-    const enteredValue = enteredValueRaw === undefined || enteredValueRaw === "" ? null : Number(enteredValueRaw);
+      const previousRecord =
+        records.find((r) => isPreviousMonth(r.billing_date)) || null;
 
-    const isCurrent = latest && String(targetRecord.id) === String(latest.id);
-    const isPrev = prev && String(targetRecord.id) === String(prev.id);
+      const record =
+        records.find((r) => String(r.id) === String(paymentId)) || null;
 
-    // === Previous month constraint ===
-    if (isPrev && Number(targetRecord.remaining_balance || 0) > 0) {
-      if (enteredValue === null) {
-        showStickyMessage("error", "Enter payment amount.");
-        return;
-      }
-      const required = Number(targetRecord.remaining_balance || 0);
-      if (!isAmountEqual(enteredValue, required)) {
-        showStickyMessage("error", `Previous month requires full payment of ₱${required.toFixed(2)}.`);
-        return;
-      }
-    }
-
-    // === Current month constraint ===
-    if (isCurrent) {
-      const prevRem = prev ? Number(prev.remaining_balance || 0) : 0;
-      if (prevRem > 0) {
-        showStickyMessage(
-          "error",
-          `Cannot record current month. Previous month (${new Date(prev.billing_date).toLocaleDateString(
-            "en-US",
-            { month: "long", year: "numeric" }
-          )}) has unpaid balance ₱${prevRem}. Record that first.`
-        );
+      if (!record) {
+        showStickyMessage("error", "Record not found.");
         return;
       }
 
-      if (targetRecord.payment_1 > 0 && enteredValue <= 0) {
-        showStickyMessage("error", "Enter a valid amount for payment.");
+      const enteredRaw = adminPayments[paymentId];
+      const entered = Number(enteredRaw);
+
+      if (!enteredRaw || entered <= 0) {
+        showStickyMessage("error", "Enter a valid payment amount.");
         return;
       }
 
-      // enforce payment_2 equals remaining_balance if payment_2
-      if (enteredValueRaw && targetRecord.payment_1 > 0) {
-        const remaining = Number(targetRecord.remaining_balance || 0);
-        if (!isAmountEqual(enteredValue, remaining)) {
-          showStickyMessage("error", `Payment 2 must equal remaining balance ₱${remaining.toFixed(2)}.`);
+      /* ==================================================
+       PREVIOUS MONTH → FULL PAYMENT ONLY
+    ================================================== */
+      if (isPreviousMonth(record.billing_date)) {
+        const remaining = Number(record.remaining_balance || 0);
+
+        if (!isAmountEqual(entered, remaining)) {
+          showStickyMessage(
+            "error",
+            `Previous month requires FULL payment of ₱${remaining.toFixed(2)}.`
+          );
           return;
         }
       }
-    }
 
-    // Proceed to record payment
-    await adminRecordPayment(paymentId, Number(enteredValue));
-    showStickyMessage("success", "Payment recorded successfully.");
+      /* ==================================================
+       CURRENT MONTH RULES
+    ================================================== */
+      if (isCurrentMonth(record.billing_date)) {
+        // Block if previous month unpaid
+        if (previousRecord && Number(previousRecord.remaining_balance) > 0) {
+          showStickyMessage(
+            "error",
+            "You must fully pay the previous month before paying the current month."
+          );
+          return;
+        }
 
-    // Refresh user records and notifications
-    await loadUserRecords(userId);
+        const remaining = Number(record.remaining_balance || 0);
+        const isPayment2 = Number(record.payment_1 || 0) > 0;
 
-    // Mark related notifications as read
-    const relatedNotifications = notifications.filter(
-      (n) => n.user_id === userId && !n.is_read && n.title.includes("Payment")
-    );
-    for (const notif of relatedNotifications) {
-      try {
-        await markAdminNotificationRead(notif.id);
-      } catch (err) {
-        console.error("markAdminNotificationRead:", err);
+        if (isPayment2) {
+          // Payment 2 → must match remaining balance
+          if (!isAmountEqual(entered, remaining)) {
+            showStickyMessage(
+              "error",
+              `Final payment must be exactly ₱${remaining.toFixed(2)}.`
+            );
+            return;
+          }
+        } else {
+          // Payment 1 → partial allowed but cannot exceed remaining
+          if (entered > remaining) {
+            showStickyMessage("error", "Payment exceeds remaining balance.");
+            return;
+          }
+        }
       }
-    }
-    setNotifications((prev) => prev.filter((n) => !(n.user_id === userId && n.title.includes("Payment"))));
 
-    // Generate receipt
-    // Generate receipt with payment type
-    try {
-      const enteredAmount = Number(adminPayments[paymentId]);
-      const records = recordsByUser[userId] || [];
-      const record = records.find(r => String(r.id) === String(paymentId));
-      const paymentType = record.payment_1 === 0 ? "Payment 1" : "Payment 2"; // or some logic based on remaining_balance
-      await handleGenerateReceipt(userId, paymentId, enteredAmount, paymentType);
+      /* ==================================================
+       RECORD PAYMENT
+    ================================================== */
+      await adminRecordPayment(paymentId, entered);
+      showStickyMessage("success", "Payment recorded successfully.");
+
+      /* ==================================================
+       MARK ADMIN NOTIFICATIONS AS READ
+    ================================================== */
+      const relatedNotifications = notifications.filter(
+        (n) => n.user_id === userId && !n.is_read && n.title.includes("Payment")
+      );
+
+      for (const notif of relatedNotifications) {
+        try {
+          await markAdminNotificationRead(notif.id);
+        } catch (err) {
+          console.error("markAdminNotificationRead error:", err);
+        }
+      }
+
+      // Optional: update UI instantly
+      setNotifications((prev) =>
+        prev.filter(
+          (n) => !(n.user_id === userId && n.title.includes("Payment"))
+        )
+      );
+
+      /* ==================================================
+       GENERATE RECEIPT
+    ================================================== */
+      const paymentType = isPreviousMonth(record.billing_date)
+        ? "Full Payment (Previous Month)"
+        : Number(record.payment_1 || 0) > 0
+        ? "Payment 2"
+        : "Payment 1";
+
+      await handleGenerateReceipt(userId, paymentId, entered, paymentType);
+
+      /* ==================================================
+       REFRESH DATA
+    ================================================== */
+      await loadUserRecords(userId);
+
+      setAdminPayments((prev) => {
+        const copy = { ...prev };
+        delete copy[paymentId];
+        return copy;
+      });
     } catch (err) {
-      console.error("handleGenerateReceipt error:", err);
+      console.error("handleSubmitPayment error:", err);
+      showStickyMessage("error", "Failed to record payment.");
     }
+  };
 
+  const handleGenerateReceipt = async (
+    userId,
+    consumptionId,
+    amountPaid,
+    paymentType
+  ) => {
+    try {
+      const res = await fetchReceipt(consumptionId);
+      const receiptData = res.data;
+      const today = new Date().toLocaleDateString();
 
-    setAdminPayments((prev) => {
-      const copy = { ...prev };
-      delete copy[paymentId];
-      return copy;
-    });
-  } catch (err) {
-    console.error("handleSubmitPayment error:", err);
-    showStickyMessage("error", "Failed to record payment.");
-  }
-};
-
-
-  const handleGenerateReceipt = async (userId, consumptionId, amountPaid, paymentType) => {
-  try {
-    const res = await fetchReceipt(consumptionId);
-    const receiptData = res.data;
-    const today = new Date().toLocaleDateString();
-
-    await sendNotificationPerUser({
-      user_id: userId,
-      title: `Official Receipt: ${receiptData.receipt_number}`,
-      message: `Hello ${receiptData.name}, your ${paymentType} of ₱${amountPaid.toFixed(2)} for ${new Date(
-        receiptData.billing_date
-      ).toLocaleDateString()} has been confirmed on ${today}. Receipt Number: ${receiptData.receipt_number}`,
-      type: "receipt",
-    });
-  } catch (err) {
-    console.error("handleGenerateReceipt:", err);
-  }
-};
-
+      await sendNotificationPerUser({
+        user_id: userId,
+        title: `Official Receipt: ${receiptData.receipt_number}`,
+        message: `Hello ${
+          receiptData.name
+        }, your ${paymentType} of ₱${amountPaid.toFixed(2)} for ${new Date(
+          receiptData.billing_date
+        ).toLocaleDateString()} has been confirmed on ${today}. Receipt Number: ${
+          receiptData.receipt_number
+        }`,
+        type: "receipt",
+      });
+    } catch (err) {
+      console.error("handleGenerateReceipt:", err);
+    }
+  };
 
   // Notice modal
   const openNoticeModal = (userId) => {
@@ -329,7 +380,9 @@ const ManageRecords = () => {
       {stickyMessage && (
         <div
           className={`fixed top-4 right-4 z-50 p-4 rounded shadow-lg font-semibold flex items-center gap-4 ${
-            stickyMessage.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
+            stickyMessage.type === "success"
+              ? "bg-green-600 text-white"
+              : "bg-red-600 text-white"
           }`}
         >
           <span>{stickyMessage.text}</span>
@@ -346,16 +399,28 @@ const ManageRecords = () => {
             <button
               key={f}
               className={`px-3 py-1 rounded ${
-                userFilter === f ? (f === "pending" ? "bg-yellow-400 text-white" : "bg-blue-600 text-white") : "bg-gray-200 text-gray-800"
+                userFilter === f
+                  ? f === "pending"
+                    ? "bg-yellow-400 text-white"
+                    : "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-800"
               }`}
               onClick={() => setUserFilter(f)}
             >
-              {f === "all" ? "All Users" : f === "pending" ? "Pending Approval" : "Approved"}
+              {f === "all"
+                ? "All Users"
+                : f === "pending"
+                ? "Pending Approval"
+                : "Approved"}
             </button>
           ))}
         </div>
 
-        <select className="shadow rounded px-2 py-1" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
+        <select
+          className="shadow rounded px-2 py-1"
+          value={paymentFilter}
+          onChange={(e) => setPaymentFilter(e.target.value)}
+        >
           <option value="all">All Status</option>
           <option value="paid">Paid</option>
           <option value="partial">Partial</option>
@@ -370,12 +435,19 @@ const ManageRecords = () => {
         <p>No users found.</p>
       ) : (
         filteredUsers.map((user) => {
-          const hasPendingPayment = notifications.some((n) => n.user_id === user.id && !n.is_read && n.title.includes("Payment"));
+          const hasPendingPayment = notifications.some(
+            (n) =>
+              n.user_id === user.id && !n.is_read && n.title.includes("Payment")
+          );
           const records = recordsByUser[user.id] || [];
-          const latestRecord = records[0] || null;
-          const prevRecord = records[1] || null;
+          const latestRecord =
+            records.find((r) => isCurrentMonth(r.billing_date)) || null;
+          const prevRecord =
+            records.find((r) => isPreviousMonth(r.billing_date)) || null;
+
           const paymentStatus = getStatus(latestRecord);
-          const prevUnpaidExists = prevRecord && Number(prevRecord.remaining_balance || 0) > 0;
+          const prevUnpaidExists =
+            prevRecord && Number(prevRecord.remaining_balance || 0) > 0;
 
           return (
             <div
@@ -386,15 +458,31 @@ const ManageRecords = () => {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <button className="text-lg font-semibold text-blue-600 hover:text-blue-500" onClick={() => expandUser(user.id)}>
+                  <button
+                    className="text-lg font-semibold text-blue-600 hover:text-blue-500"
+                    onClick={() => expandUser(user.id)}
+                  >
                     {user.name}
                   </button>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${getStatusClass(paymentStatus)}`}>{paymentStatus}</span>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-bold ${getStatusClass(
+                      paymentStatus
+                    )}`}
+                  >
+                    {paymentStatus}
+                  </span>
                 </div>
 
                 <div className="flex gap-2 items-center">
-                  {hasPendingPayment && <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-200 text-yellow-800">Pending Approval</span>}
-                  <button onClick={() => openNoticeModal(user.id)} className="ml-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white px-4 py-1 rounded shadow hover:shadow-lg flex items-center gap-2">
+                  {hasPendingPayment && (
+                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-200 text-yellow-800">
+                      Pending Approval
+                    </span>
+                  )}
+                  <button
+                    onClick={() => openNoticeModal(user.id)}
+                    className="ml-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white px-4 py-1 rounded shadow hover:shadow-lg flex items-center gap-2"
+                  >
                     <FaPaperPlane /> Send Notice
                   </button>
                 </div>
@@ -417,51 +505,108 @@ const ManageRecords = () => {
                         })
                         .map((r, index) => {
                           const status = getStatus(r);
-                          const isCurrent = index === 0;
-                          const isPrev = index === 1;
-                          const disablePaymentDueToPrev = isCurrent && records[1] && getStatus(records[1]) !== "Paid";
+                          const isCurrent = isCurrentMonth(r.billing_date);
+                          const isPrev = isPreviousMonth(r.billing_date);
+
+                          const disablePaymentDueToPrev =
+                            isCurrent &&
+                            records[1] &&
+                            getStatus(records[1]) !== "Paid";
 
                           const inputVal =
                             adminPayments[r.id] !== undefined
                               ? adminPayments[r.id]
                               : isPrev
-                              ? String(Number(r.remaining_balance || 0).toFixed(2))
+                              ? String(
+                                  Number(r.remaining_balance || 0).toFixed(2)
+                                )
                               : "";
 
                           return (
-                            <div key={r.id} className="p-4 bg-gray-50 rounded-lg flex flex-col gap-2 shadow relative hover:shadow-md transition">
-                              <span className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(status)}`}>
+                            <div
+                              key={r.id}
+                              className="p-4 bg-gray-50 rounded-lg flex flex-col gap-2 shadow relative hover:shadow-md transition"
+                            >
+                              <span
+                                className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(
+                                  status
+                                )}`}
+                              >
                                 {status}
                               </span>
 
-                              <p><strong>Billing Month:</strong> {new Date(r.billing_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
-                              <p><strong>Previous Reading:</strong> {r.previous_reading ?? "N/A"}</p>
-                              <p><strong>Current Reading:</strong> {r.present_reading ?? "N/A"}</p>
-                              <p><strong>Consumption:</strong> {r.cubic_used ?? "0"} m³</p>
-                              <p><strong>Total Bill:</strong> ₱{r.total_bill ?? "0"}</p>
-                              <p><strong>Payment 1:</strong> ₱{r.payment_1 ?? "0"}</p>
-                              <p><strong>Payment 2:</strong> ₱{r.payment_2 ?? "0"}</p>
-                              <p><strong>Remaining Balance:</strong> ₱{r.remaining_balance ?? "0"}</p>
-                              <p><strong>Reference Code:</strong> {r.reference_code || "N/A"}</p>
+                              <p>
+                                <strong>Billing Month:</strong>{" "}
+                                {new Date(r.billing_date).toLocaleDateString(
+                                  "en-US",
+                                  { month: "long", year: "numeric" }
+                                )}
+                              </p>
+                              <p>
+                                <strong>Previous Reading:</strong>{" "}
+                                {r.previous_reading ?? "N/A"}
+                              </p>
+                              <p>
+                                <strong>Current Reading:</strong>{" "}
+                                {r.present_reading ?? "N/A"}
+                              </p>
+                              <p>
+                                <strong>Consumption:</strong>{" "}
+                                {r.cubic_used ?? "0"} m³
+                              </p>
+                              <p>
+                                <strong>Total Bill:</strong> ₱
+                                {r.total_bill ?? "0"}
+                              </p>
+                              <p>
+                                <strong>Payment 1:</strong> ₱
+                                {r.payment_1 ?? "0"}
+                              </p>
+                              <p>
+                                <strong>Payment 2:</strong> ₱
+                                {r.payment_2 ?? "0"}
+                              </p>
+                              <p>
+                                <strong>Remaining Balance:</strong> ₱
+                                {r.remaining_balance ?? "0"}
+                              </p>
+                              <p>
+                                <strong>Reference Code:</strong>{" "}
+                                {r.reference_code || "N/A"}
+                              </p>
 
                               {status !== "Paid" && (
                                 <div className="flex flex-col gap-2 mt-2">
-                                  {isPrev && Number(r.remaining_balance || 0) > 0 && (
-                                    <p className="text-sm text-blue-700">Previous month requires FULL payment.</p>
-                                  )}
+                                  {isPrev &&
+                                    Number(r.remaining_balance || 0) > 0 && (
+                                      <p className="text-sm text-blue-700">
+                                        Previous month requires FULL payment.
+                                      </p>
+                                    )}
                                   <div className="flex gap-2">
                                     <input
                                       type="number"
                                       step="0.01"
                                       className="p-2 border rounded w-1/2 focus:ring-1 focus:ring-blue-500"
                                       placeholder="Enter payment amount"
-                                      onChange={(e) => setAdminPayments((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                                      onChange={(e) =>
+                                        setAdminPayments((prev) => ({
+                                          ...prev,
+                                          [r.id]: e.target.value,
+                                        }))
+                                      }
                                       disabled={disablePaymentDueToPrev}
                                       // value={inputVal}
                                     />
                                     <button
-                                      className={`bg-green-600 p-2 rounded hover:bg-green-700 text-white transition ${disablePaymentDueToPrev ? "opacity-60 cursor-not-allowed" : ""}`}
-                                      onClick={() => handleSubmitPayment(user.id, r.id)}
+                                      className={`bg-green-600 p-2 rounded hover:bg-green-700 text-white transition ${
+                                        disablePaymentDueToPrev
+                                          ? "opacity-60 cursor-not-allowed"
+                                          : ""
+                                      }`}
+                                      onClick={() =>
+                                        handleSubmitPayment(user.id, r.id)
+                                      }
                                       disabled={disablePaymentDueToPrev}
                                     >
                                       Record Payment
@@ -473,41 +618,59 @@ const ManageRecords = () => {
                           );
                         })
                     ) : (
-                      <p>No payment records found (for current or previous month).</p>
+                      <p>
+                        No payment records found (for current or previous
+                        month).
+                      </p>
                     )}
                   </div>
 
                   {/* Right side: Payment Proofs */}
                   <div className="col-span-1 p-3 bg-white rounded-lg shadow flex flex-col items-center overflow-auto">
-                    <h2 className="text-lg font-semibold mb-2 text-center">Payment Proof</h2>
+                    <h2 className="text-lg font-semibold mb-2 text-center">
+                      Payment Proof
+                    </h2>
                     {records.length > 0 ? (
                       records
-                        .filter((r, index) => {
-                          // Show proof images even for fully paid previous month?
-                          const isPrev = index === 1;
-                          const status = getStatus(r);
-                          if (isPrev && status === "Paid") return false;
+                        .filter((r) => {
+                          if (
+                            isPreviousMonth(r.billing_date) &&
+                            getStatus(r) === "Paid"
+                          ) {
+                            return false;
+                          }
                           return true;
                         })
+
                         .map((rec) => (
                           <div key={rec.id} className="mb-4 text-center w-full">
                             <p className="text-sm font-medium mb-1">
-                              {new Date(rec.billing_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                              {new Date(rec.billing_date).toLocaleDateString(
+                                "en-US",
+                                { month: "long", year: "numeric" }
+                              )}
                             </p>
                             {rec.proof_url ? (
-                              <img src={`http://localhost:5000${rec.proof_url}`} alt={`Proof ${rec.id}`} className="w-56 h-56 rounded-lg shadow object-contain mx-auto" />
+                              <img
+                                src={`http://localhost:5000${rec.proof_url}`}
+                                alt={`Proof ${rec.id}`}
+                                className="w-56 h-56 rounded-lg shadow object-contain mx-auto"
+                              />
                             ) : (
-                              <p className="text-gray-500 italic text-sm">No proof uploaded for this month.</p>
+                              <p className="text-gray-500 italic text-sm">
+                                No proof uploaded for this month.
+                              </p>
                             )}
                           </div>
                         ))
                     ) : (
-                      <p className="text-gray-500 italic">No proofs available.</p>
+                      <p className="text-gray-500 italic">
+                        No proofs available.
+                      </p>
                     )}
                   </div>
                 </div>
               )}
-
             </div>
           );
         })
@@ -517,19 +680,43 @@ const ManageRecords = () => {
       {showNoticeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 bg-transparent">
           <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
-            <h2 className="text-xl font-bold mb-4 text-blue-700 border-b pb-2">Send Personal Notification</h2>
+            <h2 className="text-xl font-bold mb-4 text-blue-700 border-b pb-2">
+              Send Personal Notification
+            </h2>
 
-            <label className="block mb-2 text-sm font-medium text-gray-700">Title</label>
-            <input type="text" placeholder="Enter notification title" value={noticeTitle} onChange={(e) => setNoticeTitle(e.target.value)} className="w-full p-3 border rounded mb-4 focus:ring-2 focus:ring-blue-500" />
+            <label className="block mb-2 text-sm font-medium text-gray-700">
+              Title
+            </label>
+            <input
+              type="text"
+              placeholder="Enter notification title"
+              value={noticeTitle}
+              onChange={(e) => setNoticeTitle(e.target.value)}
+              className="w-full p-3 border rounded mb-4 focus:ring-2 focus:ring-blue-500"
+            />
 
-            <label className="block mb-2 text-sm font-medium text-gray-700">Message</label>
-            <textarea placeholder="Enter notification message" value={noticeMessage} onChange={(e) => setNoticeMessage(e.target.value)} className="w-full p-3 border rounded mb-4 focus:ring-2 focus:ring-blue-500" />
+            <label className="block mb-2 text-sm font-medium text-gray-700">
+              Message
+            </label>
+            <textarea
+              placeholder="Enter notification message"
+              value={noticeMessage}
+              onChange={(e) => setNoticeMessage(e.target.value)}
+              className="w-full p-3 border rounded mb-4 focus:ring-2 focus:ring-blue-500"
+            />
 
             <div className="flex justify-end gap-2">
-              <button className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition" onClick={() => setShowNoticeModal(false)}>
+              <button
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
+                onClick={() => setShowNoticeModal(false)}
+              >
                 Cancel
               </button>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onClick={handleSendPersonalNotice} disabled={sendingNotice}>
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                onClick={handleSendPersonalNotice}
+                disabled={sendingNotice}
+              >
                 {sendingNotice ? "Sending..." : "Send Notice"}
               </button>
             </div>

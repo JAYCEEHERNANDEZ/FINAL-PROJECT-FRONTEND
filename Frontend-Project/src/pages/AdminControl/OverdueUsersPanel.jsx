@@ -5,6 +5,7 @@ const OverdueUsersPanel = () => {
   const [overdueUsers, setOverdueUsers] = useState([]);
   const [sendingNotice, setSendingNotice] = useState(false);
 
+  // Load overdue users on mount
   useEffect(() => {
     loadOverdueUsers();
   }, []);
@@ -12,35 +13,65 @@ const OverdueUsersPanel = () => {
   const loadOverdueUsers = async () => {
     try {
       const res = await fetchOverdueUsers();
-      if (res.data.success) setOverdueUsers(res.data.users);
+      if (res.data.success) {
+        // Map backend notice_sent to frontend noticeSent
+        const usersWithNoticeFlag = res.data.users.map(u => ({
+          ...u,
+          noticeSent: u.notice_sent || false,
+        }));
+        setOverdueUsers(usersWithNoticeFlag);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error loading overdue users:", err);
     }
   };
 
-  const handleSendOverdueNotice = async (user) => {
+  // Send notice for a single user
+  const handleSendOverdueNotice = async (userIndex) => {
+    const user = overdueUsers[userIndex];
+    if (user.noticeSent) return; // prevent sending again
+
     setSendingNotice(true);
     try {
-      await sendDeactNotice({ user_id: user.user_id, billing_date: user.billing_date });
-      loadOverdueUsers();
+      const res = await sendDeactNotice({
+        user_id: user.user_id,
+        billing_date: user.billing_date,
+      });
+
+      if (res.data.success) {
+        const updated = [...overdueUsers];
+        updated[userIndex].noticeSent = true;
+        setOverdueUsers(updated);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error sending notice:", err);
     } finally {
       setSendingNotice(false);
     }
   };
 
+  // Send notice for all users
   const handleSendNoticeAll = async () => {
     setSendingNotice(true);
     try {
-      for (const u of overdueUsers) {
-        if (!u.notice_sent) {
-          await sendDeactNotice({ user_id: u.user_id, billing_date: u.billing_date });
+      const updated = [...overdueUsers];
+
+      for (let i = 0; i < overdueUsers.length; i++) {
+        if (!updated[i].noticeSent) {
+          const res = await sendDeactNotice({
+            user_id: updated[i].user_id,
+            billing_date: updated[i].billing_date,
+          });
+
+          if (res.data.success) {
+            updated[i].noticeSent = true;
+          }
         }
       }
-      loadOverdueUsers();
+
+      setOverdueUsers(updated);
     } catch (err) {
-      console.error(err);
+      console.error("Error sending all notices:", err);
     } finally {
       setSendingNotice(false);
     }
@@ -61,8 +92,12 @@ const OverdueUsersPanel = () => {
             </button>
           )}
         </div>
-        {overdueUsers.length === 0 && <p className="text-gray-500">No overdue users</p>}
-        {overdueUsers.map((u) => (
+
+        {overdueUsers.length === 0 && (
+          <p className="text-gray-500">No overdue users</p>
+        )}
+
+        {overdueUsers.map((u, index) => (
           <div
             key={`${u.user_id}-${u.billing_date}`}
             className="flex flex-col gap-1 p-3 bg-gray-50 rounded shadow hover:shadow-md"
@@ -71,24 +106,30 @@ const OverdueUsersPanel = () => {
               <span className="font-semibold">{u.name}</span>
               <button
                 className={`px-2 py-1 text-xs rounded ${
-                  u.notice_sent
+                  u.noticeSent
                     ? "bg-gray-400 text-white cursor-not-allowed"
                     : "bg-red-600 text-white hover:bg-red-700"
                 }`}
-                onClick={() => handleSendOverdueNotice(u)}
-                disabled={u.notice_sent || sendingNotice}
+                onClick={() => handleSendOverdueNotice(index)}
+                disabled={u.noticeSent || sendingNotice}
               >
-                {u.notice_sent ? "Sent" : "Send"}
+                {u.noticeSent ? "Sent" : "Send"}
               </button>
             </div>
             <p className="text-sm text-gray-700">
-              Billing Date: {new Date(u.billing_date).toLocaleDateString()}
+              Billing Date:{" "}
+              {u.billing_date
+                ? new Date(u.billing_date).toLocaleDateString()
+                : "-"}
             </p>
             <p className="text-sm text-gray-700">
-              Due Date: {new Date(u.due_date).toLocaleDateString()}
+              Due Date:{" "}
+              {u.due_date
+                ? new Date(u.due_date).toLocaleDateString()
+                : "-"}
             </p>
             <p className="text-sm text-red-600 font-semibold">
-              Remaining: ₱{u.remaining_balance}
+              Remaining: ₱{u.remaining_balance || 0}
             </p>
           </div>
         ))}

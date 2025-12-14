@@ -265,7 +265,7 @@ const ResidentPaymentDashboard = () => {
               </div>
               <p className="text-gray-600 mt-1">
                 {isEnforced
-                  ? "You have unpaid bills from the previous month. Pay the oldest first before newer bills."
+                  ? "You have unpaid bills from the previous month."
                   : "Latest Unpaid / Current Month Balance"}
               </p>
               {selectedBill && (

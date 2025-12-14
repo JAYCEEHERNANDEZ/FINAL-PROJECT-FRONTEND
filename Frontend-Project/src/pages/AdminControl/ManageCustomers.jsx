@@ -172,7 +172,7 @@ const ManageCustomers = () => {
                   <th className="p-3 text-left text-blue-700">Name</th>
                   <th className="p-3 text-left text-blue-700">Username</th>
                   <th className="p-3 text-left text-blue-700">Status</th>
-                  <th className="p-3 text-left text-blue-700">Actions</th>
+                  <th className="p-3 text-left text-blue-700">Deactivate/Reactivate</th>
                 </tr>
               </thead>
               <tbody>
@@ -214,4 +214,3 @@ const ManageCustomers = () => {
 };
 
 export default ManageCustomers;
-gi
